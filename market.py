@@ -13,7 +13,27 @@ def itemSearch(d, name):
         for value in d[key]:
             if itemList[key][value] == name:
                 return key
-    return 
+    return
+
+def avgHigh(d):
+    sum = 0
+    counter = 0
+    for key in d:
+        low = key['avgLowPrice']
+        if low != None:
+            sum += low
+            counter += 1
+    print(f'average low: {sum//counter}')
+
+def avgLow(d):
+    sum = 0
+    counter = 0
+    for key in d:
+        high = key['avgHighPrice']
+        if high != None:
+            sum += high
+            counter += 1
+    print(f'average high: {sum//counter}')
 
 
 loop = True
@@ -31,10 +51,9 @@ while loop:
         continue
     break
             
-print(requests.get('https://prices.runescape.wiki/api/v1/osrs/latest?id='+itemNumber, headers=headers).json())
-#https://services.runescape.com/m=itemdb_rs/api/catalogue/detail.json?item=X
-
-# itemNum = input("Enter item number: ")
-# #itemLookup = "https://services.runescape.com/m=itemdb_rs/api/catalogue/detail.json?item=" + str(itemNum)
-# itemLookup = requests.get("https://services.runescape.com/m=itemdb_rs/api/catalogue/detail.json?item=" + str(itemNum))
-# print(itemLookup.json())
+test = requests.get('https://prices.runescape.wiki/api/v1/osrs/timeseries?timestep=5m&id='+itemNumber, headers=headers)
+#print(test.json())
+test = test.json()
+test = test['data']
+avgHigh(test)
+avgLow(test)
