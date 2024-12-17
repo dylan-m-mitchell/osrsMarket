@@ -1,4 +1,5 @@
 import requests
+from datetime import datetime
 
 headers = {
     'User-Agent': 'osrsMarket app',
@@ -19,22 +20,42 @@ def avgHigh(d):
     sum = 0
     counter = 0
     for key in d:
-        low = key['avgLowPrice']
+        low = key['avgHighPrice']
         if low != None:
             sum += low
             counter += 1
-    print(f'average low: {sum//counter}')
+    return sum//counter
 
 def avgLow(d):
     sum = 0
     counter = 0
     for key in d:
-        high = key['avgHighPrice']
+        high = key['avgLowPrice']
         if high != None:
             sum += high
             counter += 1
-    print(f'average high: {sum//counter}')
+    return sum//counter
 
+def get5minData():
+    test = requests.get('https://prices.runescape.wiki/api/v1/osrs/timeseries?timestep=5m&id='+itemNumber, headers=headers)
+    #print(test.json())
+    test = test.json()
+    test = test['data']
+    low = avgLow(test)
+    high = avgHigh(test)
+    tax = (high*.01)//1
+    margin = high - low - tax
+    print(f'Average High: {high}\nAverage low: {low}\nMargin: {margin}')
+
+def getLatestData():
+    req = requests.get("https://prices.runescape.wiki/api/v1/osrs/latest?id="+itemNumber, headers=headers).json()
+    print(req['data'][itemNumber]['highTime'])
+    time = datetime.fromtimestamp(req['data'][itemNumber]['highTime'])
+    now = datetime.now()
+    nowMin = now.minute
+    
+    print(f'Last sold {nowMin - time.minute} minute(s) ago.')
+    
 
 loop = True
 while loop:
@@ -51,9 +72,4 @@ while loop:
         continue
     break
             
-test = requests.get('https://prices.runescape.wiki/api/v1/osrs/timeseries?timestep=5m&id='+itemNumber, headers=headers)
-#print(test.json())
-test = test.json()
-test = test['data']
-avgHigh(test)
-avgLow(test)
+getLatestData()
