@@ -1,5 +1,8 @@
 import requests
 from datetime import datetime
+import streamlit as st
+import pandas as pd
+
 
 headers = {
     'User-Agent': 'osrsMarket app',
@@ -38,7 +41,6 @@ def avgLow(d):
 
 def get5minData():
     test = requests.get('https://prices.runescape.wiki/api/v1/osrs/timeseries?timestep=5m&id='+itemNumber, headers=headers)
-    #print(test.json())
     test = test.json()
     test = test['data']
     low = avgLow(test)
@@ -55,10 +57,15 @@ def getLatestData():
     nowMin = now.minute
     
     print(f'Last sold {nowMin - time.minute} minute(s) ago.')
+
+# def printChart(d):
+#     df = pd.DataFrame(d)
+#     st.line_chart(df)
     
 
 loop = True
 while loop:
+    
     itemName = input('Type item name: ')
     #print(itemList['25672'])
     itemName = itemName.lower()
@@ -72,4 +79,4 @@ while loop:
         continue
     break
             
-getLatestData()
+get5minData()
