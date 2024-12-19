@@ -3,6 +3,7 @@ from datetime import datetime
 import streamlit as st
 import pandas as pd
 
+st.title("OSRS Grand Exchange Data")
 
 headers = {
     'User-Agent': 'osrsMarket app',
@@ -39,44 +40,116 @@ def avgLow(d):
             counter += 1
     return sum//counter
 
-def get5minData():
+def get24hrData():
     test = requests.get('https://prices.runescape.wiki/api/v1/osrs/timeseries?timestep=5m&id='+itemNumber, headers=headers)
     test = test.json()
     test = test['data']
     low = avgLow(test)
     high = avgHigh(test)
-    tax = (high*.01)//1
-    margin = high - low - tax
-    print(f'Average High: {high}\nAverage low: {low}\nMargin: {margin}')
+    st.write(f"Average High: {high}\n\nAverage low: {low}")
+    st.write("Use Scroll Wheel to Zoom in on the Chart")
+    printChart(test)
 
 def getLatestData():
     req = requests.get("https://prices.runescape.wiki/api/v1/osrs/latest?id="+itemNumber, headers=headers).json()
-    print(req['data'][itemNumber]['highTime'])
+    #print(req['data'][itemNumber]['highTime'])
     time = datetime.fromtimestamp(req['data'][itemNumber]['highTime'])
     now = datetime.now()
     nowMin = now.minute
-    
-    print(f'Last sold {nowMin - time.minute} minute(s) ago.')
+    high = req['data'][itemNumber]['high']
+    low = req['data'][itemNumber]['low']
+    tax = (high*.01)//1
+    margin = high - low - tax
+    st.write(f"Insta Buy Price: {high}\n\nInsta Sell Price: {low}\n\nMargin: {margin}")
+    st.write(f'Last sold {nowMin - time.minute} minute(s) ago.')
 
-# def printChart(d):
-#     df = pd.DataFrame(d)
-#     st.line_chart(df)
+def printChart(d):
     
-
-loop = True
-while loop:
+    timeList = list()
+    highPrice = list()
+    lowPrice = list()
+    highVol = list()
+    lowVol = list()
     
-    itemName = input('Type item name: ')
+    for value in d:
+        highPrice.append(value.get('avgHighPrice'))
+        lowPrice.append(value.get('avgLowPrice'))
+        highVol.append(value.get('highPriceVolume'))
+        lowVol.append(value.get('lowPriceVolume'))
+        time = datetime.fromtimestamp(value.get('timestamp'))
+        time = time.strftime("%H:%M")
+        timeList.append(time)
+    
+    df = pd.DataFrame({
+        'avgLowPrice': lowPrice,
+        'avgHighPrice': highPrice,
+        'timestamp':timeList
+    })
+    st.line_chart(df, x='timestamp')
+    
+try:
+    itemName = st.text_input('Type item name: ')
     #print(itemList['25672'])
+    
     itemName = itemName.lower()
     itemName = itemName.capitalize()
     
     itemNumber = itemSearch(itemList, itemName)
-    try:
-        num = int(itemNumber)
-    except TypeError:
-        print('Please make sure item is spelled and spaced correctly.')
-        continue
-    break
-            
-get5minData()
+    
+    num = int(itemNumber)
+except(TypeError, NameError):
+    st.write('Please make sure item is spelled and spaced correctly.')
+
+st.write('The current item is:', itemName)
+
+options = {
+    "Latest Data":getLatestData,
+    "24 Hour History":get24hrData,
+}
+
+try:
+    selected_option = st.selectbox("Select Option...", list(options.keys()), index=None)
+    options[selected_option]()
+except KeyError:
+    st.write()
+    
+
+
+# st.selectbox(
+#     "What information would you like to see?",
+#     ("Latest Data", "24 Hour History"),
+#     index=None,
+#     placeholder="Select option...",
+# )
+
+
+
+
+
+
+
+
+
+
+
+# loop = True
+
+# while loop:
+#     try:
+#         itemName = st.text_input('Type item name: ')
+#     #print(itemList['25672'])
+    
+#         st.write('The current item is:', itemName)
+
+#         itemName = itemName.lower()
+#         itemName = itemName.capitalize()
+    
+#         itemNumber = itemSearch(itemList, itemName)
+    
+#         num = int(itemNumber)
+#     except(TypeError, NameError):
+#         st.write('Please make sure item is spelled and spaced correctly.')
+#         continue
+#     break
+
+#get5minData()
