@@ -17,6 +17,8 @@ const dataDisplay = document.getElementById('dataDisplay');
 const chartContainer = document.getElementById('chartContainer');
 const timeSlider = document.getElementById('timeSlider');
 const timeRangeDisplay = document.getElementById('timeRangeDisplay');
+const quickAlertSection = document.getElementById('quickAlertSection');
+const quickAlertBtn = document.getElementById('quickAlertBtn');
 
 // Create autocomplete container
 const autocompleteContainer = document.createElement('div');
@@ -34,6 +36,9 @@ itemInput.addEventListener('keypress', (e) => {
 itemInput.addEventListener('input', handleAutocomplete);
 itemInput.addEventListener('keydown', handleAutocompleteKeydown);
 timeSlider.addEventListener('input', handleTimeSliderChange);
+if (quickAlertBtn) {
+    quickAlertBtn.addEventListener('click', showQuickAlertModal);
+}
 
 // Close autocomplete when clicking outside
 document.addEventListener('click', (e) => {
@@ -195,10 +200,17 @@ function searchItem() {
             currentItemNumber = null;
             currentItemName = null;
             currentItemDiv.textContent = '';
+            if (quickAlertSection) {
+                quickAlertSection.style.display = 'none';
+            }
         } else {
             currentItemNumber = data.itemNumber;
             currentItemName = data.itemName;
             currentItemDiv.textContent = `The current item is: ${data.itemName}`;
+            // Show quick alert button if user is authenticated
+            if (quickAlertSection) {
+                quickAlertSection.style.display = 'block';
+            }
             // Automatically load both latest and historical data
             loadAllData();
         }
@@ -423,4 +435,75 @@ function updateChart(chartData) {
     priceChart.data.datasets[0].data = avgLowPrices;
     priceChart.data.datasets[1].data = avgHighPrices;
     priceChart.update();
+}
+
+function showQuickAlertModal() {
+    if (!currentItemNumber || !currentItemName) {
+        showError('Please search for an item first');
+        return;
+    }
+    
+    const alertType = prompt(
+        `Create alert for ${currentItemName}\n\n` +
+        `Choose alert type:\n` +
+        `1. Price Spike (increase)\n` +
+        `2. Price Dip (decrease)\n` +
+        `3. Any Fluctuation\n\n` +
+        `Enter 1, 2, or 3:`,
+        '1'
+    );
+    
+    if (!alertType || !['1', '2', '3'].includes(alertType)) {
+        return;
+    }
+    
+    const threshold = prompt(
+        `Enter threshold percentage (0-100):\n\n` +
+        `Example: Enter 5 for 5% change`,
+        '5'
+    );
+    
+    if (!threshold) {
+        return;
+    }
+    
+    const thresholdNum = parseFloat(threshold);
+    if (isNaN(thresholdNum) || thresholdNum <= 0 || thresholdNum > 100) {
+        showError('Invalid threshold. Must be between 0 and 100');
+        return;
+    }
+    
+    const alertTypeMap = {
+        '1': 'spike',
+        '2': 'dip',
+        '3': 'fluctuation'
+    };
+    
+    // Create alert via API
+    fetch('/api/alerts', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken
+        },
+        body: JSON.stringify({
+            item_id: currentItemNumber,
+            item_name: currentItemName,
+            alert_type: alertTypeMap[alertType],
+            threshold: thresholdNum
+        })
+    })
+    .then(async response => {
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.error || 'Failed to create alert');
+        }
+        return data;
+    })
+    .then(() => {
+        alert(`Alert created successfully for ${currentItemName}!\n\nYou can manage your alerts from the Alerts page.`);
+    })
+    .catch(error => {
+        showError('Failed to create alert: ' + error.message);
+    });
 }

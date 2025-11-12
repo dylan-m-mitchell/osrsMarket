@@ -49,6 +49,12 @@
         
         <div id="currentItem" class="current-item"></div>
         
+        {% if current_user.is_authenticated %}
+        <div id="quickAlertSection" class="quick-alert-section" style="display: none;">
+            <button id="quickAlertBtn" class="btn-quick-alert">⚡ Create Price Alert for This Item</button>
+        </div>
+        {% endif %}
+        
         <div id="errorMessage" class="error-message"></div>
         
         <div id="dataDisplay" class="data-display"></div>
