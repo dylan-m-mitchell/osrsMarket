@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Good Trades - OSRS Grand Exchange</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/trades.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Good Trades</h1>
+        
+        <nav class="nav-links">
+            <a href="/">← Back to Item Search</a>
+        </nav>
+        
+        <div class="info-box">
+            <p>This page shows items with positive profit margins. Margins are calculated as: <strong>Sell Price - Buy Price - 1% Tax</strong></p>
+            <p>Items are sorted by profitability, considering both margin amount and ROI%.</p>
+        </div>
+        
+        <div id="loading" class="loading">Loading good trades...</div>
+        <div id="errorMessage" class="error-message"></div>
+        
+        <div id="tradesContainer" class="trades-container">
+            <div class="filter-section">
+                <label for="minMargin">Min Margin (gp):</label>
+                <input type="number" id="minMargin" value="0" min="0" step="100">
+                
+                <label for="minROI">Min ROI (%):</label>
+                <input type="number" id="minROI" value="0" min="0" step="1">
+                
+                <button id="filterBtn">Apply Filter</button>
+                <button id="resetBtn">Reset</button>
+            </div>
+            
+            <div class="table-wrapper">
+                <table id="tradesTable">
+                    <thead>
+                        <tr>
+                            <th>Item Name</th>
+                            <th>Buy Price</th>
+                            <th>Sell Price</th>
+                            <th>Tax (1%)</th>
+                            <th>Margin</th>
+                            <th>ROI %</th>
+                            <th>Last Update</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tradesTableBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <script src="{{ url_for('static', filename='js/trades.js') }}"></script>
+</body>
+</html>

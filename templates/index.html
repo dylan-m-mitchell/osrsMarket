@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OSRS Grand Exchange Data</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="{{ url_for('static', filename='js/chart.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/chartjs-plugin-zoom.min.js') }}"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>OSRS Grand Exchange Data</h1>
+        
+        <nav class="nav-links">
+            <a href="/trades">View Good Trades →</a>
+        </nav>
+        
+        <div class="search-section">
+            <label for="itemInput">Type item name:</label>
+            <input type="text" id="itemInput" placeholder="Enter item name...">
+            <button id="searchBtn">Search</button>
+        </div>
+        
+        <div id="currentItem" class="current-item"></div>
+        
+        <div id="errorMessage" class="error-message"></div>
+        
+        <div id="dataDisplay" class="data-display"></div>
+        
+        <div id="chartContainer" style="display: none;">
+            <div class="time-slider-container">
+                <label for="timeSlider">Time Range: <span id="timeRangeDisplay">24 hours</span></label>
+                <input type="range" id="timeSlider" min="1" max="24" value="24" step="1">
+            </div>
+            <p class="chart-info">Use mouse wheel to zoom in on the chart</p>
+            <canvas id="priceChart"></canvas>
+        </div>
+    </div>
+    
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
