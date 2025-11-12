@@ -19,20 +19,15 @@
         
         <div id="currentItem" class="current-item"></div>
         
-        <div class="options-section" id="optionsSection" style="display: none;">
-            <label for="optionSelect">Select Option...</label>
-            <select id="optionSelect">
-                <option value="">Choose an option</option>
-                <option value="latest">Latest Data</option>
-                <option value="history">24 Hour History</option>
-            </select>
-        </div>
-        
         <div id="errorMessage" class="error-message"></div>
         
         <div id="dataDisplay" class="data-display"></div>
         
         <div id="chartContainer" style="display: none;">
+            <div class="time-slider-container">
+                <label for="timeSlider">Time Range: <span id="timeRangeDisplay">24 hours</span></label>
+                <input type="range" id="timeSlider" min="1" max="24" value="24" step="1">
+            </div>
             <p class="chart-info">Use mouse wheel to zoom in on the chart</p>
             <canvas id="priceChart"></canvas>
         </div>
