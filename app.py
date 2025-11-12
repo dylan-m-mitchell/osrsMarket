@@ -80,7 +80,9 @@ def search_item():
             'itemName': item_name
         })
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        # Log error for debugging but don't expose details to user
+        app.logger.error(f"Search error: {str(e)}")
+        return jsonify({'error': 'An error occurred while searching for the item'}), 500
 
 @app.route('/api/latest/<item_number>', methods=['GET'])
 def get_latest_data(item_number):
@@ -124,7 +126,9 @@ def get_latest_data(item_number):
             'minutesAgo': int(minutes_ago) if minutes_ago else None
         })
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        # Log error for debugging but don't expose details to user
+        app.logger.error(f"Latest data error: {str(e)}")
+        return jsonify({'error': 'An error occurred while fetching latest data'}), 500
 
 @app.route('/api/history/<item_number>', methods=['GET'])
 def get_24hr_data(item_number):
@@ -169,7 +173,11 @@ def get_24hr_data(item_number):
             'chartData': chart_data
         })
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        # Log error for debugging but don't expose details to user
+        app.logger.error(f"Historical data error: {str(e)}")
+        return jsonify({'error': 'An error occurred while fetching historical data'}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    import os
+    debug_mode = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
+    app.run(debug=debug_mode, host='0.0.0.0', port=5000)
