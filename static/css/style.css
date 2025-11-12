@@ -27,6 +27,38 @@ h1 {
 
 .search-section {
     margin-bottom: 20px;
+    position: relative;
+}
+
+.autocomplete-items {
+    position: absolute;
+    border: 1px solid #4a4a5e;
+    border-top: none;
+    z-index: 99;
+    top: 100%;
+    left: 0;
+    right: 0;
+    max-height: 200px;
+    overflow-y: auto;
+    background-color: #262730;
+    border-radius: 0 0 5px 5px;
+}
+
+.autocomplete-item {
+    padding: 10px;
+    cursor: pointer;
+    background-color: #262730;
+    border-bottom: 1px solid #4a4a5e;
+    color: #fafafa;
+}
+
+.autocomplete-item:hover,
+.autocomplete-item.autocomplete-active {
+    background-color: #3a3a4e;
+}
+
+.autocomplete-item:last-child {
+    border-bottom: none;
 }
 
 label {

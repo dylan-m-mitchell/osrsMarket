@@ -2,6 +2,8 @@ import requests
 from datetime import datetime
 from flask import Flask, render_template, jsonify, request
 import pandas as pd
+import json
+import os
 
 app = Flask(__name__)
 
@@ -17,8 +19,18 @@ def get_item_list():
     """Get and cache the item list"""
     global item_list_cache
     if item_list_cache is None:
-        response = requests.get("https://www.osrsbox.com/osrsbox-db/items-summary.json")
-        item_list_cache = response.json()
+        try:
+            response = requests.get("https://www.osrsbox.com/osrsbox-db/items-summary.json", timeout=5)
+            item_list_cache = response.json()
+        except Exception as e:
+            # Fallback to mock data if external API is unavailable
+            app.logger.warning(f"Unable to fetch item list from API: {str(e)}, using mock data")
+            mock_file = os.path.join(os.path.dirname(__file__), 'mock_items.json')
+            if os.path.exists(mock_file):
+                with open(mock_file, 'r') as f:
+                    item_list_cache = json.load(f)
+            else:
+                item_list_cache = {}
     return item_list_cache
 
 def item_search(d, name):
@@ -55,6 +67,32 @@ def avg_low(d):
 def index():
     """Serve the main page"""
     return render_template('index.html')
+
+@app.route('/api/autocomplete', methods=['GET'])
+def autocomplete():
+    """Get item name suggestions for autocomplete"""
+    try:
+        query = request.args.get('query', '').strip().lower()
+        
+        if not query or len(query) < 2:
+            return jsonify([])
+        
+        item_list = get_item_list()
+        suggestions = []
+        
+        # Search for items that match the query
+        for item_id in item_list:
+            item_name = item_list[item_id].get('name', '')
+            if item_name and query in item_name.lower():
+                suggestions.append(item_name)
+                # Limit to 10 suggestions
+                if len(suggestions) >= 10:
+                    break
+        
+        return jsonify(suggestions)
+    except Exception as e:
+        app.logger.error(f"Autocomplete error: {str(e)}")
+        return jsonify([])
 
 @app.route('/api/search', methods=['POST'])
 def search_item():

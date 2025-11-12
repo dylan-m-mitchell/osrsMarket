@@ -1,6 +1,8 @@
 let currentItemNumber = null;
 let currentItemName = null;
 let priceChart = null;
+let autocompleteTimeout = null;
+let selectedSuggestionIndex = -1;
 
 // DOM elements
 const itemInput = document.getElementById('itemInput');
@@ -12,6 +14,12 @@ const errorMessage = document.getElementById('errorMessage');
 const dataDisplay = document.getElementById('dataDisplay');
 const chartContainer = document.getElementById('chartContainer');
 
+// Create autocomplete container
+const autocompleteContainer = document.createElement('div');
+autocompleteContainer.id = 'autocomplete';
+autocompleteContainer.className = 'autocomplete-items';
+itemInput.parentNode.insertBefore(autocompleteContainer, itemInput.nextSibling);
+
 // Event listeners
 searchBtn.addEventListener('click', searchItem);
 itemInput.addEventListener('keypress', (e) => {
@@ -19,9 +27,102 @@ itemInput.addEventListener('keypress', (e) => {
         searchItem();
     }
 });
+itemInput.addEventListener('input', handleAutocomplete);
+itemInput.addEventListener('keydown', handleAutocompleteKeydown);
 optionSelect.addEventListener('change', handleOptionChange);
 
+// Close autocomplete when clicking outside
+document.addEventListener('click', (e) => {
+    if (e.target !== itemInput) {
+        closeAutocomplete();
+    }
+});
+
 // Functions
+function handleAutocomplete() {
+    clearTimeout(autocompleteTimeout);
+    const query = itemInput.value.trim();
+    
+    if (query.length < 2) {
+        closeAutocomplete();
+        return;
+    }
+    
+    // Debounce autocomplete requests
+    autocompleteTimeout = setTimeout(() => {
+        fetch(`/api/autocomplete?query=${encodeURIComponent(query)}`)
+            .then(response => response.json())
+            .then(suggestions => {
+                displaySuggestions(suggestions);
+            })
+            .catch(error => {
+                console.error('Autocomplete error:', error);
+            });
+    }, 300);
+}
+
+function displaySuggestions(suggestions) {
+    closeAutocomplete();
+    selectedSuggestionIndex = -1;
+    
+    if (suggestions.length === 0) {
+        return;
+    }
+    
+    suggestions.forEach((suggestion, index) => {
+        const div = document.createElement('div');
+        div.className = 'autocomplete-item';
+        div.textContent = suggestion;
+        div.addEventListener('click', () => {
+            itemInput.value = suggestion;
+            closeAutocomplete();
+        });
+        autocompleteContainer.appendChild(div);
+    });
+}
+
+function closeAutocomplete() {
+    autocompleteContainer.innerHTML = '';
+    selectedSuggestionIndex = -1;
+}
+
+function handleAutocompleteKeydown(e) {
+    const items = autocompleteContainer.getElementsByClassName('autocomplete-item');
+    
+    if (items.length === 0) {
+        return;
+    }
+    
+    if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        selectedSuggestionIndex++;
+        if (selectedSuggestionIndex >= items.length) {
+            selectedSuggestionIndex = 0;
+        }
+        updateSelectedSuggestion(items);
+    } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        selectedSuggestionIndex--;
+        if (selectedSuggestionIndex < 0) {
+            selectedSuggestionIndex = items.length - 1;
+        }
+        updateSelectedSuggestion(items);
+    } else if (e.key === 'Enter' && selectedSuggestionIndex >= 0) {
+        e.preventDefault();
+        itemInput.value = items[selectedSuggestionIndex].textContent;
+        closeAutocomplete();
+    }
+}
+
+function updateSelectedSuggestion(items) {
+    for (let i = 0; i < items.length; i++) {
+        items[i].classList.remove('autocomplete-active');
+    }
+    if (selectedSuggestionIndex >= 0 && selectedSuggestionIndex < items.length) {
+        items[selectedSuggestionIndex].classList.add('autocomplete-active');
+    }
+}
+
 function showError(message) {
     errorMessage.textContent = message;
     errorMessage.classList.add('show');
@@ -43,6 +144,7 @@ function searchItem() {
     }
     
     hideError();
+    closeAutocomplete();
     dataDisplay.innerHTML = '';
     chartContainer.style.display = 'none';
     
