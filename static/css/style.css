@@ -1,0 +1,156 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #0e1117;
+    color: #fafafa;
+    padding: 20px;
+    line-height: 1.6;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+h1 {
+    color: #fafafa;
+    margin-bottom: 30px;
+    font-size: 2.5rem;
+    font-weight: 600;
+}
+
+.search-section {
+    margin-bottom: 20px;
+}
+
+label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 1rem;
+    color: #fafafa;
+}
+
+input[type="text"],
+select {
+    width: 100%;
+    padding: 12px;
+    background-color: #262730;
+    border: 1px solid #4a4a5e;
+    border-radius: 5px;
+    color: #fafafa;
+    font-size: 1rem;
+    margin-bottom: 10px;
+}
+
+input[type="text"]:focus,
+select:focus {
+    outline: none;
+    border-color: #a020f0;
+    box-shadow: 0 0 0 2px rgba(160, 32, 240, 0.2);
+}
+
+button {
+    background-color: #a020f0;
+    color: white;
+    padding: 12px 24px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: 500;
+    transition: background-color 0.3s;
+}
+
+button:hover {
+    background-color: #8a1ad0;
+}
+
+button:active {
+    background-color: #7015b0;
+}
+
+.current-item {
+    margin: 20px 0;
+    font-size: 1.1rem;
+    color: #fafafa;
+}
+
+.options-section {
+    margin: 20px 0;
+}
+
+select {
+    cursor: pointer;
+}
+
+.error-message {
+    color: #ff6b6b;
+    margin: 20px 0;
+    padding: 12px;
+    background-color: rgba(255, 107, 107, 0.1);
+    border-left: 4px solid #ff6b6b;
+    border-radius: 4px;
+    display: none;
+}
+
+.error-message.show {
+    display: block;
+}
+
+.data-display {
+    margin: 20px 0;
+    padding: 20px;
+    background-color: #262730;
+    border-radius: 8px;
+    border: 1px solid #4a4a5e;
+    white-space: pre-line;
+    line-height: 1.8;
+}
+
+.data-display:empty {
+    display: none;
+}
+
+.data-display strong {
+    color: #a020f0;
+}
+
+#chartContainer {
+    margin-top: 30px;
+    padding: 20px;
+    background-color: #262730;
+    border-radius: 8px;
+    border: 1px solid #4a4a5e;
+}
+
+.chart-info {
+    margin-bottom: 15px;
+    color: #b0b0b0;
+    font-size: 0.9rem;
+    text-align: center;
+}
+
+#priceChart {
+    max-height: 400px;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    h1 {
+        font-size: 2rem;
+    }
+    
+    .container {
+        padding: 10px;
+    }
+    
+    body {
+        padding: 10px;
+    }
+}
