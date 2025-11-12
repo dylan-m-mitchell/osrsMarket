@@ -44,3 +44,6 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Mock data for testing
+mock_items.json
