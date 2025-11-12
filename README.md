@@ -12,6 +12,13 @@ Ability to search any item in the game and return Grand Exchange data on that it
   - Login/logout functionality
   - Account settings page
   - CSRF protection on all forms
+- **Price Change and Rare Event Alerts** 🆕
+  - Create custom alerts for price spikes, dips, or fluctuations
+  - Set percentage thresholds for alert triggers
+  - Monitor specific items automatically
+  - Receive notifications when alerts are triggered
+  - Quick alert creation from item search page
+  - Manage all alerts from dedicated alerts page
 
 ## Security Features
 - Password hashing using Werkzeug's secure password hashing
