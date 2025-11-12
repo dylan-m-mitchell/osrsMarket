@@ -1,0 +1,175 @@
+import requests
+from datetime import datetime
+from flask import Flask, render_template, jsonify, request
+import pandas as pd
+
+app = Flask(__name__)
+
+headers = {
+    'User-Agent': 'osrsMarket app',
+    'From': 'dlnmtchll@gmail.com' 
+}
+
+# Cache for item list
+item_list_cache = None
+
+def get_item_list():
+    """Get and cache the item list"""
+    global item_list_cache
+    if item_list_cache is None:
+        response = requests.get("https://www.osrsbox.com/osrsbox-db/items-summary.json")
+        item_list_cache = response.json()
+    return item_list_cache
+
+def item_search(d, name):
+    """Search for an item by name"""
+    for key in d:
+        for value in d[key]:
+            if d[key][value] == name:
+                return key
+    return None
+
+def avg_high(d):
+    """Calculate average high price"""
+    sum_val = 0
+    counter = 0
+    for key in d:
+        low = key['avgHighPrice']
+        if low is not None:
+            sum_val += low
+            counter += 1
+    return sum_val // counter if counter > 0 else 0
+
+def avg_low(d):
+    """Calculate average low price"""
+    sum_val = 0
+    counter = 0
+    for key in d:
+        high = key['avgLowPrice']
+        if high is not None:
+            sum_val += high
+            counter += 1
+    return sum_val // counter if counter > 0 else 0
+
+@app.route('/')
+def index():
+    """Serve the main page"""
+    return render_template('index.html')
+
+@app.route('/api/search', methods=['POST'])
+def search_item():
+    """Search for an item by name"""
+    try:
+        data = request.get_json()
+        item_name = data.get('itemName', '')
+        
+        if not item_name:
+            return jsonify({'error': 'Item name is required'}), 400
+        
+        # Normalize item name
+        item_name = item_name.strip().lower().capitalize()
+        
+        item_list = get_item_list()
+        item_number = item_search(item_list, item_name)
+        
+        if item_number is None:
+            return jsonify({'error': 'Item not found. Please check spelling and spacing.'}), 404
+        
+        return jsonify({
+            'itemNumber': item_number,
+            'itemName': item_name
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/latest/<item_number>', methods=['GET'])
+def get_latest_data(item_number):
+    """Get latest market data for an item"""
+    try:
+        req = requests.get(
+            f"https://prices.runescape.wiki/api/v1/osrs/latest?id={item_number}", 
+            headers=headers
+        ).json()
+        
+        if 'data' not in req or item_number not in req['data']:
+            return jsonify({'error': 'No data available for this item'}), 404
+        
+        item_data = req['data'][item_number]
+        
+        # Calculate time since last sale
+        high_time = item_data.get('highTime')
+        if high_time:
+            time = datetime.fromtimestamp(high_time)
+            now = datetime.now()
+            minutes_ago = (now - time).total_seconds() / 60
+        else:
+            minutes_ago = None
+        
+        high = item_data.get('high')
+        low = item_data.get('low')
+        
+        # Calculate margin (including 1% tax)
+        if high and low:
+            tax = (high * 0.01) // 1
+            margin = high - low - tax
+        else:
+            tax = None
+            margin = None
+        
+        return jsonify({
+            'high': high,
+            'low': low,
+            'tax': tax,
+            'margin': margin,
+            'minutesAgo': int(minutes_ago) if minutes_ago else None
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/history/<item_number>', methods=['GET'])
+def get_24hr_data(item_number):
+    """Get 24-hour historical data for an item"""
+    try:
+        response = requests.get(
+            f'https://prices.runescape.wiki/api/v1/osrs/timeseries?timestep=5m&id={item_number}', 
+            headers=headers
+        )
+        data = response.json()
+        
+        if 'data' not in data:
+            return jsonify({'error': 'No historical data available'}), 404
+        
+        time_series_data = data['data']
+        
+        # Calculate averages
+        avg_low_price = avg_low(time_series_data)
+        avg_high_price = avg_high(time_series_data)
+        
+        # Prepare chart data
+        chart_data = []
+        for value in time_series_data:
+            timestamp = value.get('timestamp')
+            if timestamp:
+                time = datetime.fromtimestamp(timestamp)
+                time_str = time.strftime("%H:%M")
+            else:
+                time_str = None
+            
+            chart_data.append({
+                'timestamp': time_str,
+                'avgLowPrice': value.get('avgLowPrice'),
+                'avgHighPrice': value.get('avgHighPrice'),
+                'highPriceVolume': value.get('highPriceVolume'),
+                'lowPriceVolume': value.get('lowPriceVolume')
+            })
+        
+        return jsonify({
+            'avgLow': avg_low_price,
+            'avgHigh': avg_high_price,
+            'chartData': chart_data
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+if __name__ == '__main__':
+    app.run(debug=True, host='0.0.0.0', port=5000)
