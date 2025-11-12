@@ -5,6 +5,9 @@ let autocompleteTimeout = null;
 let selectedSuggestionIndex = -1;
 let fullChartData = []; // Store complete chart data for filtering
 
+// Get CSRF token from meta tag
+const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+
 // DOM elements
 const itemInput = document.getElementById('itemInput');
 const searchBtn = document.getElementById('searchBtn');
@@ -52,7 +55,17 @@ function handleAutocomplete() {
     // Debounce autocomplete requests
     autocompleteTimeout = setTimeout(() => {
         fetch(`/api/autocomplete?query=${encodeURIComponent(query)}`)
-            .then(response => response.json())
+            .then(async response => {
+                if (!response.ok) {
+                    return [];
+                }
+                try {
+                    return await response.json();
+                } catch (e) {
+                    console.error('Autocomplete parsing error:', e);
+                    return [];
+                }
+            })
             .then(suggestions => {
                 displaySuggestions(suggestions);
             })
@@ -153,10 +166,29 @@ function searchItem() {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken
         },
         body: JSON.stringify({ itemName: itemName })
     })
-    .then(response => response.json())
+    .then(async response => {
+        if (!response.ok) {
+            // Try to parse error message from response
+            let errorMessage = 'Error searching for item';
+            try {
+                const errorData = await response.json();
+                errorMessage = errorData.error || errorMessage;
+            } catch (e) {
+                // If response isn't JSON, use status text
+                errorMessage = `Error: ${response.statusText || response.status}`;
+            }
+            throw new Error(errorMessage);
+        }
+        try {
+            return await response.json();
+        } catch (e) {
+            throw new Error('Failed to parse response data');
+        }
+    })
     .then(data => {
         if (data.error) {
             showError(data.error);
@@ -173,14 +205,49 @@ function searchItem() {
     })
     .catch(error => {
         showError('Error searching for item: ' + error.message);
+        currentItemNumber = null;
+        currentItemName = null;
+        currentItemDiv.textContent = '';
     });
 }
 
 function loadAllData() {
     // Load both latest and historical data
     Promise.all([
-        fetch(`/api/latest/${currentItemNumber}`).then(res => res.json()),
-        fetch(`/api/history/${currentItemNumber}`).then(res => res.json())
+        fetch(`/api/latest/${currentItemNumber}`).then(async res => {
+            if (!res.ok) {
+                let errorMessage = 'Error fetching latest data';
+                try {
+                    const errorData = await res.json();
+                    errorMessage = errorData.error || errorMessage;
+                } catch (e) {
+                    errorMessage = `Error: ${res.statusText || res.status}`;
+                }
+                return { error: errorMessage };
+            }
+            try {
+                return await res.json();
+            } catch (e) {
+                return { error: 'Failed to parse response data' };
+            }
+        }),
+        fetch(`/api/history/${currentItemNumber}`).then(async res => {
+            if (!res.ok) {
+                let errorMessage = 'Error fetching historical data';
+                try {
+                    const errorData = await res.json();
+                    errorMessage = errorData.error || errorMessage;
+                } catch (e) {
+                    errorMessage = `Error: ${res.statusText || res.status}`;
+                }
+                return { error: errorMessage };
+            }
+            try {
+                return await res.json();
+            } catch (e) {
+                return { error: 'Failed to parse response data' };
+            }
+        })
     ])
     .then(([latestData, historyData]) => {
         if (latestData.error || historyData.error) {

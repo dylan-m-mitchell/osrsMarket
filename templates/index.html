@@ -3,8 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OSRS Grand Exchange Data</title>
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>OSRS Market</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">
     <script src="{{ url_for('static', filename='js/chart.min.js') }}"></script>
     <script src="{{ url_for('static', filename='js/chartjs-plugin-zoom.min.js') }}"></script>
 </head>
@@ -32,7 +34,7 @@
     </div>
     
     <div class="container">
-        <h1>OSRS Grand Exchange Data</h1>
+        <h1>OSRS Market</h1>
         
         <nav class="nav-links">
             <a href="/trades">View Good Trades →</a>
