@@ -2,3 +2,6 @@ Flask
 requests
 pandas
 Werkzeug
+Flask-SQLAlchemy
+Flask-Login
+bcrypt
