@@ -1,6 +1,6 @@
 import streamlit as st
 import json
-import hashlib
+import bcrypt
 import os
 from pathlib import Path
 
@@ -10,8 +10,8 @@ st.set_page_config(page_title="Account", page_icon="👤")
 USER_DATA_FILE = Path(__file__).parent.parent / "users.json"
 
 def hash_password(password):
-    """Hash a password for storing."""
-    return hashlib.sha256(password.encode()).hexdigest()
+    """Hash a password for storing using bcrypt."""
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
 def load_users():
     """Load users from JSON file."""
@@ -45,7 +45,7 @@ def login(username, password):
     if username not in users:
         return False, "Username not found"
     
-    if users[username]["password"] == hash_password(password):
+    if bcrypt.checkpw(password.encode('utf-8'), users[username]["password"].encode('utf-8')):
         return True, "Login successful"
     return False, "Incorrect password"
 
