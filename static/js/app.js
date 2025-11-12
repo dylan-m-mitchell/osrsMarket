@@ -3,16 +3,17 @@ let currentItemName = null;
 let priceChart = null;
 let autocompleteTimeout = null;
 let selectedSuggestionIndex = -1;
+let fullChartData = []; // Store complete chart data for filtering
 
 // DOM elements
 const itemInput = document.getElementById('itemInput');
 const searchBtn = document.getElementById('searchBtn');
 const currentItemDiv = document.getElementById('currentItem');
-const optionsSection = document.getElementById('optionsSection');
-const optionSelect = document.getElementById('optionSelect');
 const errorMessage = document.getElementById('errorMessage');
 const dataDisplay = document.getElementById('dataDisplay');
 const chartContainer = document.getElementById('chartContainer');
+const timeSlider = document.getElementById('timeSlider');
+const timeRangeDisplay = document.getElementById('timeRangeDisplay');
 
 // Create autocomplete container
 const autocompleteContainer = document.createElement('div');
@@ -29,7 +30,7 @@ itemInput.addEventListener('keypress', (e) => {
 });
 itemInput.addEventListener('input', handleAutocomplete);
 itemInput.addEventListener('keydown', handleAutocompleteKeydown);
-optionSelect.addEventListener('change', handleOptionChange);
+timeSlider.addEventListener('input', handleTimeSliderChange);
 
 // Close autocomplete when clicking outside
 document.addEventListener('click', (e) => {
@@ -162,13 +163,12 @@ function searchItem() {
             currentItemNumber = null;
             currentItemName = null;
             currentItemDiv.textContent = '';
-            optionsSection.style.display = 'none';
         } else {
             currentItemNumber = data.itemNumber;
             currentItemName = data.itemName;
             currentItemDiv.textContent = `The current item is: ${data.itemName}`;
-            optionsSection.style.display = 'block';
-            optionSelect.value = '';
+            // Automatically load both latest and historical data
+            loadAllData();
         }
     })
     .catch(error => {
@@ -176,68 +176,56 @@ function searchItem() {
     });
 }
 
-function handleOptionChange() {
-    const option = optionSelect.value;
-    
-    if (!option || !currentItemNumber) {
-        return;
-    }
-    
-    hideError();
-    dataDisplay.innerHTML = '';
-    chartContainer.style.display = 'none';
-    
-    if (option === 'latest') {
-        getLatestData();
-    } else if (option === 'history') {
-        get24HourHistory();
-    }
+function loadAllData() {
+    // Load both latest and historical data
+    Promise.all([
+        fetch(`/api/latest/${currentItemNumber}`).then(res => res.json()),
+        fetch(`/api/history/${currentItemNumber}`).then(res => res.json())
+    ])
+    .then(([latestData, historyData]) => {
+        if (latestData.error || historyData.error) {
+            showError(latestData.error || historyData.error);
+        } else {
+            displayCombinedData(latestData, historyData);
+        }
+    })
+    .catch(error => {
+        showError('Error fetching data: ' + error.message);
+    });
 }
 
-function getLatestData() {
-    fetch(`/api/latest/${currentItemNumber}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.error) {
-                showError(data.error);
-            } else {
-                let displayText = '';
-                displayText += `Insta Buy Price: ${data.high !== null ? data.high : 'N/A'}\n\n`;
-                displayText += `Insta Sell Price: ${data.low !== null ? data.low : 'N/A'}\n\n`;
-                displayText += `Margin: ${data.margin !== null ? data.margin : 'N/A'}`;
-                
-                if (data.minutesAgo !== null) {
-                    displayText += `\n\nLast sold ${data.minutesAgo} minute(s) ago.`;
-                }
-                
-                dataDisplay.textContent = displayText;
-            }
-        })
-        .catch(error => {
-            showError('Error fetching latest data: ' + error.message);
-        });
+function displayCombinedData(latestData, historyData) {
+    // Display insta buy/sell and 24-hour averages
+    let displayText = '';
+    displayText += `Insta Buy Price: ${latestData.high !== null ? latestData.high : 'N/A'}\n\n`;
+    displayText += `Insta Sell Price: ${latestData.low !== null ? latestData.low : 'N/A'}\n\n`;
+    displayText += `Margin: ${latestData.margin !== null ? latestData.margin : 'N/A'}`;
+    
+    if (latestData.minutesAgo !== null) {
+        displayText += `\n\nLast sold ${latestData.minutesAgo} minute(s) ago.`;
+    }
+    
+    displayText += `\n\n24 Hour Average High: ${historyData.avgHigh}`;
+    displayText += `\n24 Hour Average Low: ${historyData.avgLow}`;
+    
+    dataDisplay.textContent = displayText;
+    
+    // Store full chart data and display chart
+    fullChartData = historyData.chartData;
+    displayChart(fullChartData);
 }
 
-function get24HourHistory() {
-    fetch(`/api/history/${currentItemNumber}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.error) {
-                showError(data.error);
-            } else {
-                let displayText = '';
-                displayText += `Average High: ${data.avgHigh}\n\n`;
-                displayText += `Average Low: ${data.avgLow}`;
-                
-                dataDisplay.textContent = displayText;
-                
-                // Display chart
-                displayChart(data.chartData);
-            }
-        })
-        .catch(error => {
-            showError('Error fetching historical data: ' + error.message);
-        });
+function handleTimeSliderChange() {
+    const hours = parseInt(timeSlider.value);
+    timeRangeDisplay.textContent = `${hours} hour${hours !== 1 ? 's' : ''}`;
+    
+    // Filter chart data based on selected time range
+    if (fullChartData.length > 0) {
+        const dataPointsPerHour = 12; // 5-minute intervals = 12 per hour
+        const pointsToShow = hours * dataPointsPerHour;
+        const filteredData = fullChartData.slice(-pointsToShow);
+        updateChart(filteredData);
+    }
 }
 
 function displayChart(chartData) {
@@ -324,4 +312,18 @@ function displayChart(chartData) {
             }
         }
     });
+}
+
+function updateChart(chartData) {
+    if (!priceChart) return;
+    
+    // Update chart data
+    const labels = chartData.map(d => d.timestamp).filter(t => t !== null);
+    const avgLowPrices = chartData.map(d => d.avgLowPrice);
+    const avgHighPrices = chartData.map(d => d.avgHighPrice);
+    
+    priceChart.data.labels = labels;
+    priceChart.data.datasets[0].data = avgLowPrices;
+    priceChart.data.datasets[1].data = avgHighPrices;
+    priceChart.update();
 }

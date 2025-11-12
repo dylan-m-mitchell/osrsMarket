@@ -113,10 +113,6 @@ button:active {
     color: #fafafa;
 }
 
-.options-section {
-    margin: 20px 0;
-}
-
 select {
     cursor: pointer;
 }
@@ -159,6 +155,61 @@ select {
     background-color: #262730;
     border-radius: 8px;
     border: 1px solid #4a4a5e;
+}
+
+.time-slider-container {
+    margin-bottom: 20px;
+    padding: 15px;
+    background-color: #1a1a24;
+    border-radius: 5px;
+}
+
+.time-slider-container label {
+    display: block;
+    margin-bottom: 10px;
+    font-size: 1rem;
+    color: #fafafa;
+}
+
+#timeSlider {
+    width: 100%;
+    height: 8px;
+    background: #4a4a5e;
+    outline: none;
+    border-radius: 5px;
+    -webkit-appearance: none;
+}
+
+#timeSlider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    background: #a020f0;
+    cursor: pointer;
+    border-radius: 50%;
+}
+
+#timeSlider::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    background: #a020f0;
+    cursor: pointer;
+    border-radius: 50%;
+    border: none;
+}
+
+#timeSlider:hover::-webkit-slider-thumb {
+    background: #8a1ad0;
+}
+
+#timeSlider:hover::-moz-range-thumb {
+    background: #8a1ad0;
+}
+
+#timeRangeDisplay {
+    color: #a020f0;
+    font-weight: 600;
 }
 
 .chart-info {
