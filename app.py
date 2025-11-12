@@ -1,9 +1,130 @@
 import requests
 from datetime import datetime
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, redirect, url_for, flash, session
 import os
+from flask_login import LoginManager, login_user, logout_user, login_required, current_user
+from flask_wtf.csrf import CSRFProtect
+from models import db, User
 
 app = Flask(__name__)
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///osrs_market.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['WTF_CSRF_TIME_LIMIT'] = None  # CSRF tokens don't expire
+
+# Initialize database
+db.init_app(app)
+
+# Initialize CSRF protection
+csrf = CSRFProtect(app)
+
+# Initialize Flask-Login
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+
+@login_manager.user_loader
+def load_user(user_id):
+    """Load user by ID for Flask-Login"""
+    return User.query.get(int(user_id))
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    """User registration"""
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+    
+    if request.method == 'POST':
+        try:
+            data = request.get_json()
+            
+            # Check if data is None (malformed request)
+            if data is None:
+                return jsonify({'error': 'Invalid request format'}), 400
+            
+            username = data.get('username', '').strip()
+            email = data.get('email', '').strip()
+            password = data.get('password', '')
+            
+            # Validate input
+            if not username or not email or not password:
+                return jsonify({'error': 'All fields are required'}), 400
+            
+            if len(username) < 3 or len(username) > 80:
+                return jsonify({'error': 'Username must be between 3 and 80 characters'}), 400
+            
+            if len(password) < 8:
+                return jsonify({'error': 'Password must be at least 8 characters'}), 400
+            
+            # Check if user already exists
+            if User.query.filter_by(username=username).first():
+                return jsonify({'error': 'Username already exists'}), 400
+            
+            if User.query.filter_by(email=email).first():
+                return jsonify({'error': 'Email already registered'}), 400
+            
+            # Create new user
+            user = User(username=username, email=email)
+            user.set_password(password)
+            db.session.add(user)
+            db.session.commit()
+            
+            # Log the user in
+            login_user(user)
+            
+            return jsonify({'success': True, 'message': 'Registration successful'})
+        except Exception as e:
+            app.logger.error(f"Registration error: {str(e)}")
+            return jsonify({'error': 'An error occurred during registration'}), 500
+    
+    return render_template('register.html')
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    """User login"""
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+    
+    if request.method == 'POST':
+        try:
+            data = request.get_json()
+            
+            # Check if data is None (malformed request)
+            if data is None:
+                return jsonify({'error': 'Invalid request format'}), 400
+            
+            username = data.get('username', '').strip()
+            password = data.get('password', '')
+            
+            if not username or not password:
+                return jsonify({'error': 'Username and password are required'}), 400
+            
+            user = User.query.filter_by(username=username).first()
+            
+            if user is None or not user.check_password(password):
+                return jsonify({'error': 'Invalid username or password'}), 401
+            
+            login_user(user)
+            return jsonify({'success': True, 'message': 'Login successful'})
+        except Exception as e:
+            app.logger.error(f"Login error: {str(e)}")
+            return jsonify({'error': 'An error occurred during login'}), 500
+    
+    return render_template('login.html')
+
+@app.route('/logout')
+@login_required
+def logout():
+    """User logout"""
+    logout_user()
+    return redirect(url_for('index'))
+
+@app.route('/account')
+@login_required
+def account():
+    """User account page"""
+    return render_template('account.html')
+
 
 headers = {
     'User-Agent': 'osrsMarket app',
@@ -17,16 +138,21 @@ def get_item_list():
     """Get and cache the item list"""
     global item_list_cache
     if item_list_cache is None:
-        response = requests.get("https://www.osrsbox.com/osrsbox-db/items-summary.json", timeout=5)
-        item_list_cache = response.json()
+        try:
+            response = requests.get("https://www.osrsbox.com/osrsbox-db/items-summary.json", timeout=5)
+            response.raise_for_status()  # Raise an exception for bad status codes
+            item_list_cache = response.json()
+        except Exception as e:
+            app.logger.error(f"Error fetching item list: {str(e)}")
+            # Return empty dict if we can't fetch the item list
+            item_list_cache = {}
     return item_list_cache
 
 def item_search(d, name):
     """Search for an item by name"""
     for key in d:
-        for value in d[key]:
-            if d[key][value] == name:
-                return key
+        if d[key].get('name') == name:
+            return key
     return None
 
 def avg_high(d):
@@ -284,5 +410,8 @@ def get_good_trades():
 
 if __name__ == '__main__':
     import os
+    # Create database tables if they don't exist
+    with app.app_context():
+        db.create_all()
     debug_mode = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
     app.run(debug=debug_mode, host='0.0.0.0', port=8080)

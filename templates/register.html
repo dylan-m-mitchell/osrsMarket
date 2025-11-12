@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Up - OSRS Grand Exchange</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-box">
+            <h1>Sign Up</h1>
+            <p class="auth-subtitle">Create your OSRS Market account</p>
+            
+            <form id="registerForm">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" required autocomplete="username" 
+                           minlength="3" maxlength="80" placeholder="Choose a username">
+                </div>
+                
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" name="email" required autocomplete="email"
+                           placeholder="your@email.com">
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required autocomplete="new-password"
+                           minlength="8" placeholder="At least 8 characters">
+                    <small class="form-hint">Password must be at least 8 characters long</small>
+                </div>
+                
+                <div id="errorMessage" class="error-message"></div>
+                
+                <button type="submit" class="auth-button">Sign Up</button>
+            </form>
+            
+            <div class="auth-footer">
+                <p>Already have an account? <a href="{{ url_for('login') }}">Sign In</a></p>
+                <p><a href="{{ url_for('index') }}">← Back to Home</a></p>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const registerForm = document.getElementById('registerForm');
+        const errorMessage = document.getElementById('errorMessage');
+        
+        registerForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const csrfToken = document.querySelector('input[name="csrf_token"]').value;
+            
+            errorMessage.textContent = '';
+            errorMessage.classList.remove('show');
+            
+            try {
+                const response = await fetch('/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken
+                    },
+                    body: JSON.stringify({ username, email, password })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    window.location.href = '/';
+                } else {
+                    errorMessage.textContent = data.error || 'Registration failed';
+                    errorMessage.classList.add('show');
+                }
+            } catch (error) {
+                errorMessage.textContent = 'An error occurred. Please try again.';
+                errorMessage.classList.add('show');
+            }
+        });
+    </script>
+</body>
+</html>
