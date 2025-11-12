@@ -3,7 +3,26 @@ from datetime import datetime
 import streamlit as st
 import pandas as pd
 
-st.title("OSRS Grand Exchange Data")
+st.set_page_config(page_title="OSRS Market", page_icon="📊", layout="wide")
+
+# Initialize session state for authentication
+if 'logged_in' not in st.session_state:
+    st.session_state.logged_in = False
+if 'username' not in st.session_state:
+    st.session_state.username = None
+
+# Display account status in header
+col1, col2 = st.columns([4, 1])
+with col1:
+    st.title("OSRS Grand Exchange Data")
+with col2:
+    if st.session_state.logged_in:
+        st.write("")  # Spacing
+        st.markdown(f"👤 **{st.session_state.username}**")
+    else:
+        st.write("")  # Spacing
+        if st.button("👤 Login/Register"):
+            st.switch_page("pages/1_Account.py")
 
 headers = {
     'User-Agent': 'osrsMarket app',
