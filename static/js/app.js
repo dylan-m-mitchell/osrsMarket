@@ -268,10 +268,37 @@ function displayChart(chartData) {
         options: {
             responsive: true,
             maintainAspectRatio: true,
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
             plugins: {
                 legend: {
                     labels: {
                         color: '#fafafa'
+                    }
+                },
+                tooltip: {
+                    enabled: true,
+                    backgroundColor: 'rgba(38, 39, 48, 0.95)',
+                    titleColor: '#fafafa',
+                    bodyColor: '#fafafa',
+                    borderColor: '#a020f0',
+                    borderWidth: 1,
+                    padding: 12,
+                    displayColors: true,
+                    callbacks: {
+                        title: function(context) {
+                            return 'Time: ' + context[0].label;
+                        },
+                        label: function(context) {
+                            const label = context.dataset.label || '';
+                            const value = context.parsed.y;
+                            if (value !== null) {
+                                return label + ': ' + value.toLocaleString() + ' gp';
+                            }
+                            return label + ': N/A';
+                        }
                     }
                 },
                 zoom: {
@@ -303,7 +330,10 @@ function displayChart(chartData) {
                 },
                 y: {
                     ticks: {
-                        color: '#fafafa'
+                        color: '#fafafa',
+                        callback: function(value) {
+                            return value.toLocaleString() + ' gp';
+                        }
                     },
                     grid: {
                         color: '#4a4a5e'

@@ -19,18 +19,8 @@ def get_item_list():
     """Get and cache the item list"""
     global item_list_cache
     if item_list_cache is None:
-        try:
-            response = requests.get("https://www.osrsbox.com/osrsbox-db/items-summary.json", timeout=5)
-            item_list_cache = response.json()
-        except Exception as e:
-            # Fallback to mock data if external API is unavailable
-            app.logger.warning(f"Unable to fetch item list from API: {str(e)}, using mock data")
-            mock_file = os.path.join(os.path.dirname(__file__), 'mock_items.json')
-            if os.path.exists(mock_file):
-                with open(mock_file, 'r') as f:
-                    item_list_cache = json.load(f)
-            else:
-                item_list_cache = {}
+        response = requests.get("https://www.osrsbox.com/osrsbox-db/items-summary.json", timeout=5)
+        item_list_cache = response.json()
     return item_list_cache
 
 def item_search(d, name):
@@ -165,16 +155,8 @@ def get_latest_data(item_number):
             'minutesAgo': int(minutes_ago) if minutes_ago else None
         })
     except Exception as e:
-        # Log error and return mock data for testing
-        app.logger.warning(f"Latest data error: {str(e)}, using mock data")
-        # Return mock data
-        return jsonify({
-            'high': 2500000,
-            'low': 2450000,
-            'tax': 25000,
-            'margin': 25000,
-            'minutesAgo': 5
-        })
+        app.logger.error(f"Latest data error: {str(e)}")
+        return jsonify({'error': 'Unable to fetch latest market data. Please try again later.'}), 500
 
 @app.route('/api/history/<item_number>', methods=['GET'])
 def get_24hr_data(item_number):
@@ -220,27 +202,8 @@ def get_24hr_data(item_number):
             'chartData': chart_data
         })
     except Exception as e:
-        # Log error and return mock data for testing
-        app.logger.warning(f"Historical data error: {str(e)}, using mock data")
-        # Generate mock chart data
-        from datetime import timedelta
-        chart_data = []
-        now = datetime.now()
-        for i in range(288):  # 24 hours * 12 (5-min intervals per hour)
-            timestamp = now - timedelta(minutes=(287-i)*5)
-            chart_data.append({
-                'timestamp': timestamp.strftime("%H:%M"),
-                'avgLowPrice': 2450000 + (i % 50) * 1000,
-                'avgHighPrice': 2500000 + (i % 50) * 1000,
-                'highPriceVolume': 100 + (i % 20),
-                'lowPriceVolume': 90 + (i % 15)
-            })
-        
-        return jsonify({
-            'avgLow': 2475000,
-            'avgHigh': 2525000,
-            'chartData': chart_data
-        })
+        app.logger.error(f"Historical data error: {str(e)}")
+        return jsonify({'error': 'Unable to fetch historical data. Please try again later.'}), 500
 
 if __name__ == '__main__':
     import os
