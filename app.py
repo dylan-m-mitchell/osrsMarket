@@ -205,6 +205,85 @@ def get_24hr_data(item_number):
         app.logger.error(f"Historical data error: {str(e)}")
         return jsonify({'error': 'Unable to fetch historical data. Please try again later.'}), 500
 
+@app.route('/trades')
+def trades():
+    """Serve the good trades page"""
+    return render_template('trades.html')
+
+@app.route('/api/good-trades', methods=['GET'])
+def get_good_trades():
+    """Get a list of items with good trading margins"""
+    try:
+        # Fetch latest prices for all items
+        response = requests.get(
+            "https://prices.runescape.wiki/api/v1/osrs/latest",
+            headers=headers,
+            timeout=10
+        )
+        latest_data = response.json()
+        
+        if 'data' not in latest_data:
+            return jsonify({'error': 'Unable to fetch market data'}), 500
+        
+        # Get item list to map IDs to names
+        item_list = get_item_list()
+        
+        # Analyze items for good trades
+        good_trades = []
+        
+        for item_id, price_data in latest_data['data'].items():
+            high = price_data.get('high')
+            low = price_data.get('low')
+            
+            # Only consider items with both buy and sell prices
+            if high is None or low is None or high <= 0 or low <= 0:
+                continue
+            
+            # Calculate margin (including 1% tax on sell price)
+            tax = int(high * 0.01)
+            margin = high - low - tax
+            
+            # Only include items with positive margin
+            if margin <= 0:
+                continue
+            
+            # Calculate ROI percentage
+            roi = (margin / low) * 100 if low > 0 else 0
+            
+            # Get item name
+            item_name = item_list.get(item_id, {}).get('name', f'Item {item_id}')
+            
+            # Check if trade is recent (within last hour)
+            high_time = price_data.get('highTime', 0)
+            low_time = price_data.get('lowTime', 0)
+            most_recent = max(high_time, low_time)
+            minutes_ago = (datetime.now().timestamp() - most_recent) / 60 if most_recent > 0 else float('inf')
+            
+            good_trades.append({
+                'id': item_id,
+                'name': item_name,
+                'high': high,
+                'low': low,
+                'tax': tax,
+                'margin': margin,
+                'roi': round(roi, 2),
+                'minutesAgo': int(minutes_ago) if minutes_ago != float('inf') else None
+            })
+        
+        # Sort by a combination of margin and ROI
+        # Prioritize items with good margin (at least 100gp) and reasonable ROI
+        good_trades.sort(key=lambda x: (
+            x['margin'] if x['margin'] >= 100 else x['margin'] * 0.1,  # Penalize small margins
+            x['roi']
+        ), reverse=True)
+        
+        # Return top 100 trades
+        return jsonify(good_trades[:100])
+        
+    except Exception as e:
+        app.logger.error(f"Good trades error: {str(e)}")
+        return jsonify({'error': 'Unable to fetch good trades data'}), 500
+
 if __name__ == '__main__':
     import os
     debug_mode = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
