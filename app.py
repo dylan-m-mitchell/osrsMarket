@@ -28,6 +28,8 @@ db.init_app(app)
 csrf = CSRFProtect(app)
 
 # Initialize Flask-Mail
+if not app.config.get('MAIL_USERNAME') or not app.config.get('MAIL_PASSWORD'):
+    raise RuntimeError("MAIL_USERNAME and MAIL_PASSWORD must be set in environment variables for email functionality.")
 mail = Mail(app)
 
 # Initialize Flask-Login
