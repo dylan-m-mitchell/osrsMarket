@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Account Settings - OSRS Grand Exchange</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">
@@ -18,7 +19,9 @@
                 </div>
                 <hr>
                 <a href="{{ url_for('account') }}">Account Settings</a>
+                {% if current_user.is_premium %}
                 <a href="{{ url_for('alerts') }}">Price Alerts</a>
+                {% endif %}
                 <a href="{{ url_for('logout') }}">Sign Out</a>
             </div>
         </div>
@@ -42,7 +45,46 @@
             <div class="info-row">
                 <strong>Member Since:</strong> {{ current_user.created_at.strftime('%B %d, %Y') }}
             </div>
+            <div class="info-row">
+                <strong>Account Type:</strong> 
+                <span class="{% if current_user.is_premium %}premium-badge{% endif %}">
+                    {{ 'Premium' if current_user.is_premium else 'Free' }}
+                </span>
+            </div>
         </div>
+        
+        {% if current_user.is_premium %}
+        <div class="account-info-box">
+            <h2>Notification Settings</h2>
+            <div class="info-row">
+                <strong>Email Notifications:</strong>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="emailNotificationsToggle" 
+                           {% if current_user.email_notifications_enabled %}checked{% endif %}>
+                    <span class="slider"></span>
+                </label>
+                <span id="emailNotificationStatus">
+                    {{ 'Enabled' if current_user.email_notifications_enabled else 'Disabled' }}
+                </span>
+            </div>
+            <p class="settings-note">
+                When enabled, you will receive email notifications when your price alerts are triggered.
+            </p>
+        </div>
+        {% else %}
+        <div class="account-info-box">
+            <h2>Premium Features</h2>
+            <p>Upgrade to premium to unlock:</p>
+            <ul>
+                <li>Price alerts for items</li>
+                <li>Email notifications</li>
+                <li>Advanced market analytics</li>
+            </ul>
+            <p class="settings-note">Contact support to upgrade your account.</p>
+        </div>
+        {% endif %}
+        
+        <div id="messageBox" class="message-box" style="display: none;"></div>
     </div>
     
     <script>
@@ -63,6 +105,130 @@
                 }
             });
         }
+        
+        // Email notifications toggle
+        const emailToggle = document.getElementById('emailNotificationsToggle');
+        const emailStatus = document.getElementById('emailNotificationStatus');
+        const messageBox = document.getElementById('messageBox');
+        
+        if (emailToggle) {
+            emailToggle.addEventListener('change', async (e) => {
+                const enabled = e.target.checked;
+                
+                try {
+                    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+                    const response = await fetch('/api/account/email-notifications', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': csrfToken
+                        },
+                        body: JSON.stringify({ enabled })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (response.ok) {
+                        emailStatus.textContent = data.enabled ? 'Enabled' : 'Disabled';
+                        showMessage(data.message, 'success');
+                    } else {
+                        // Revert toggle on error
+                        emailToggle.checked = !enabled;
+                        showMessage(data.error || 'Failed to update settings', 'error');
+                    }
+                } catch (error) {
+                    // Revert toggle on error
+                    emailToggle.checked = !enabled;
+                    showMessage('An error occurred', 'error');
+                }
+            });
+        }
+        
+        function showMessage(message, type) {
+            messageBox.textContent = message;
+            messageBox.className = 'message-box ' + type;
+            messageBox.style.display = 'block';
+            setTimeout(() => {
+                messageBox.style.display = 'none';
+            }, 3000);
+        }
     </script>
+    
+    <style>
+        .premium-badge {
+            color: #ffd700;
+            font-weight: bold;
+        }
+        
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+            margin: 0 10px;
+        }
+        
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 24px;
+        }
+        
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        
+        input:checked + .slider {
+            background-color: #2196F3;
+        }
+        
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+        
+        .settings-note {
+            margin-top: 10px;
+            font-size: 0.9em;
+            color: #888;
+        }
+        
+        .message-box {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        
+        .message-box.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .message-box.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
 </body>
 </html>

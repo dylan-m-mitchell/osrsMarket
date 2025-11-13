@@ -5,4 +5,5 @@ Werkzeug
 Flask-SQLAlchemy
 Flask-Login
 Flask-WTF
+Flask-Mail
 bcrypt

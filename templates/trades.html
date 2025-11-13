@@ -21,7 +21,9 @@
                     </div>
                     <hr>
                     <a href="{{ url_for('account') }}">Account Settings</a>
+                    {% if current_user.is_premium %}
                     <a href="{{ url_for('alerts') }}">Price Alerts</a>
+                    {% endif %}
                     <a href="{{ url_for('logout') }}">Sign Out</a>
                 </div>
             </div>
