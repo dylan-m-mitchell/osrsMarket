@@ -16,10 +16,12 @@ Ability to search any item in the game and return Grand Exchange data on that it
    pip install -r requirements.txt
    ```
 
-2. Run the Flask application:
+2. Run the application:
    ```bash
    python app.py
    ```
+   
+   The application uses Waitress, a production-quality WSGI server, to ensure reliable network connections.
 
 3. Open your browser and navigate to `http://localhost:5000`
 

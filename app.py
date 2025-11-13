@@ -284,5 +284,10 @@ def get_good_trades():
 
 if __name__ == '__main__':
     import os
-    debug_mode = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
-    app.run(debug=debug_mode, host='0.0.0.0', port=5000)
+    from waitress import serve
+    
+    # Use waitress for more reliable network connections
+    print(' * Starting osrsMarket application')
+    print(' * Running on http://0.0.0.0:5000')
+    print(' * Press CTRL+C to quit')
+    serve(app, host='0.0.0.0', port=5000)
