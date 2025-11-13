@@ -14,12 +14,21 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['WTF_CSRF_TIME_LIMIT'] = None  # CSRF tokens don't expire
 
 # Email configuration
+# If using Gmail SMTP, you must use an app-specific password and be aware of rate limits.
 app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
 app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', 587))
 app.config['MAIL_USE_TLS'] = os.environ.get('MAIL_USE_TLS', 'true').lower() == 'true'
 app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
 app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
-app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER', 'noreply@osrsmarket.com')
+# Set default sender to match MAIL_USERNAME domain if not explicitly set
+mail_username = app.config.get('MAIL_USERNAME')
+if 'MAIL_DEFAULT_SENDER' in os.environ:
+    app.config['MAIL_DEFAULT_SENDER'] = os.environ['MAIL_DEFAULT_SENDER']
+elif mail_username and '@' in mail_username:
+    sender_domain = mail_username.split('@')[1]
+    app.config['MAIL_DEFAULT_SENDER'] = f"noreply@{sender_domain}"
+else:
+    app.config['MAIL_DEFAULT_SENDER'] = 'noreply@osrsmarket.com'
 
 # Initialize database
 db.init_app(app)
