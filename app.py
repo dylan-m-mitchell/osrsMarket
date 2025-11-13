@@ -148,6 +148,9 @@ def toggle_email_notifications():
     
     try:
         data = request.get_json()
+        # Check if data is None (malformed request)
+        if data is None:
+            return jsonify({'error': 'Invalid request format'}), 400
         enabled = data.get('enabled', True)
         
         current_user.email_notifications_enabled = bool(enabled)
