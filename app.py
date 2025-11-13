@@ -194,13 +194,46 @@ Old Price: {notification.old_price:,} GP
 New Price: {notification.new_price:,} GP
 Change: {abs(notification.price_change):.2f}% {change_direction}
 
-Visit the OSRS Market app to view more details.
+Visit the OSRS Market app to view more details: https://osrs-market.example.com/
 
 ---
 This is an automated message from OSRS Market. To disable email notifications, visit your account settings.
 """
-        
-        msg = Message(subject, recipients=[user.email], body=body)
+
+        html = f"""
+<html>
+  <body style="font-family: Arial, sans-serif; color: #222;">
+    <h2>OSRS Market Alert</h2>
+    <p>Hello <strong>{user.username}</strong>,</p>
+    <p>Your price alert for <strong>{notification.item_name}</strong> has been triggered!</p>
+    <table style="border-collapse: collapse; margin-top: 10px;">
+      <tr>
+        <td style="padding: 4px 8px;"><strong>Alert Type:</strong></td>
+        <td style="padding: 4px 8px;">{alert_type_text}</td>
+      </tr>
+      <tr>
+        <td style="padding: 4px 8px;"><strong>Old Price:</strong></td>
+        <td style="padding: 4px 8px;">{notification.old_price:,} GP</td>
+      </tr>
+      <tr>
+        <td style="padding: 4px 8px;"><strong>New Price:</strong></td>
+        <td style="padding: 4px 8px;">{notification.new_price:,} GP</td>
+      </tr>
+      <tr>
+        <td style="padding: 4px 8px;"><strong>Change:</strong></td>
+        <td style="padding: 4px 8px;">{abs(notification.price_change):.2f}% {change_direction}</td>
+      </tr>
+    </table>
+    <p style="margin-top: 16px;">
+      <a href="https://osrs-market.example.com/" style="background: #007bff; color: #fff; padding: 8px 16px; text-decoration: none; border-radius: 4px;">View Alert Details</a>
+    </p>
+    <hr>
+    <small>This is an automated message from OSRS Market. To disable email notifications, visit your account settings.</small>
+  </body>
+</html>
+"""
+
+        msg = Message(subject, recipients=[user.email], body=body, html=html)
         mail.send(msg)
         app.logger.info(f"Sent email notification to {user.email} for alert {notification.id}")
     except Exception as e:
