@@ -15,6 +15,8 @@ class User(UserMixin, db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False, index=True)
     password_hash = db.Column(db.String(255), nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    is_premium = db.Column(db.Boolean, nullable=False, default=False)
+    email_notifications_enabled = db.Column(db.Boolean, nullable=False, default=True)
     
     # Relationship to alerts
     alerts = db.relationship('Alert', backref='user', lazy=True, cascade='all, delete-orphan')

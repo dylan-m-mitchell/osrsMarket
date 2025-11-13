@@ -4,6 +4,7 @@ from flask import Flask, render_template, jsonify, request, redirect, url_for, f
 import os
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from flask_wtf.csrf import CSRFProtect
+from flask_mail import Mail, Message
 from models import db, User, Alert, AlertNotification
 
 app = Flask(__name__)
@@ -12,11 +13,33 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///osrs_market.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['WTF_CSRF_TIME_LIMIT'] = None  # CSRF tokens don't expire
 
+# Email configuration
+# If using Gmail SMTP, you must use an app-specific password and be aware of rate limits.
+app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
+app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', 587))
+app.config['MAIL_USE_TLS'] = os.environ.get('MAIL_USE_TLS', 'true').lower() == 'true'
+app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
+app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
+# Set default sender to match MAIL_USERNAME domain if not explicitly set
+mail_username = app.config.get('MAIL_USERNAME')
+if 'MAIL_DEFAULT_SENDER' in os.environ:
+    app.config['MAIL_DEFAULT_SENDER'] = os.environ['MAIL_DEFAULT_SENDER']
+elif mail_username and '@' in mail_username:
+    sender_domain = mail_username.split('@')[1]
+    app.config['MAIL_DEFAULT_SENDER'] = f"noreply@{sender_domain}"
+else:
+    app.config['MAIL_DEFAULT_SENDER'] = 'noreply@osrsmarket.com'
+
 # Initialize database
 db.init_app(app)
 
 # Initialize CSRF protection
 csrf = CSRFProtect(app)
+
+# Initialize Flask-Mail
+if not app.config.get('MAIL_USERNAME') or not app.config.get('MAIL_PASSWORD'):
+    raise RuntimeError("MAIL_USERNAME and MAIL_PASSWORD must be set in environment variables for email functionality.")
+mail = Mail(app)
 
 # Initialize Flask-Login
 login_manager = LoginManager()
@@ -125,7 +148,115 @@ def account():
     """User account page"""
     return render_template('account.html')
 
+@app.route('/api/account/email-notifications', methods=['POST'])
+@login_required
+def toggle_email_notifications():
+    """Toggle email notifications for the current user"""
+    if not current_user.is_premium:
+        return jsonify({'error': 'Email notifications are only available for premium users'}), 403
+    
+    try:
+        data = request.get_json()
+        # Check if data is None (malformed request)
+        if data is None:
+            return jsonify({'error': 'Invalid request format'}), 400
+        enabled = data.get('enabled', True)
+        
+        current_user.email_notifications_enabled = bool(enabled)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'enabled': current_user.email_notifications_enabled,
+            'message': f'Email notifications {"enabled" if current_user.email_notifications_enabled else "disabled"}'
+        })
+    except Exception as e:
+        app.logger.error(f"Toggle email notifications error: {str(e)}")
+        db.session.rollback()
+        return jsonify({'error': 'An error occurred'}), 500
 
+def send_alert_email(user, notification):
+    """Send email notification for triggered alert"""
+    if not user.email_notifications_enabled or not user.is_premium:
+        return
+    
+    # Only send email if mail is properly configured
+    if not app.config.get('MAIL_USERNAME'):
+        app.logger.warning("Email notifications not configured")
+        return
+    
+    try:
+        alert_type_text = {
+            'spike': 'Price Spike',
+            'dip': 'Price Dip',
+            'fluctuation': 'Price Fluctuation'
+        }.get(notification.alert_type, 'Price Change')
+        
+        subject = f"OSRS Market Alert: {notification.item_name} - {alert_type_text}"
+        
+        change_direction = "increased" if notification.price_change > 0 else "decreased"
+        
+        body = f"""
+Hello {user.username},
+
+Your price alert for {notification.item_name} has been triggered!
+
+Alert Type: {alert_type_text}
+Old Price: {notification.old_price:,} GP
+New Price: {notification.new_price:,} GP
+Change: {abs(notification.price_change):.2f}% {change_direction}
+
+Visit the OSRS Market app to view more details: https://osrs-market.example.com/
+
+---
+This is an automated message from OSRS Market. To disable email notifications, visit your account settings.
+"""
+
+        html = f"""
+<html>
+  <body style="font-family: Arial, sans-serif; color: #222;">
+    <h2>OSRS Market Alert</h2>
+    <p>Hello <strong>{user.username}</strong>,</p>
+    <p>Your price alert for <strong>{notification.item_name}</strong> has been triggered!</p>
+    <table style="border-collapse: collapse; margin-top: 10px;">
+      <tr>
+        <td style="padding: 4px 8px;"><strong>Alert Type:</strong></td>
+        <td style="padding: 4px 8px;">{alert_type_text}</td>
+      </tr>
+      <tr>
+        <td style="padding: 4px 8px;"><strong>Old Price:</strong></td>
+        <td style="padding: 4px 8px;">{notification.old_price:,} GP</td>
+      </tr>
+      <tr>
+        <td style="padding: 4px 8px;"><strong>New Price:</strong></td>
+        <td style="padding: 4px 8px;">{notification.new_price:,} GP</td>
+      </tr>
+      <tr>
+        <td style="padding: 4px 8px;"><strong>Change:</strong></td>
+        <td style="padding: 4px 8px;">{abs(notification.price_change):.2f}% {change_direction}</td>
+      </tr>
+    </table>
+    <p style="margin-top: 16px;">
+      <a href="https://osrs-market.example.com/" style="background: #007bff; color: #fff; padding: 8px 16px; text-decoration: none; border-radius: 4px;">View Alert Details</a>
+    </p>
+    <hr>
+    <small>This is an automated message from OSRS Market. To disable email notifications, visit your account settings.</small>
+  </body>
+</html>
+"""
+
+        msg = Message(subject, recipients=[user.email], body=body, html=html)
+        mail.send(msg)
+        app.logger.info(f"Sent email notification to {user.email} for alert {notification.id}")
+    except Exception as e:
+        app.logger.error(f"Failed to send email notification: {str(e)}")
+        # Record the failure in the database for monitoring/retry
+        try:
+            notification.email_status = 'failed'
+            notification.email_error = str(e)
+            db.session.commit()
+        except Exception as db_e:
+            app.logger.error(f"Failed to record email failure in DB: {str(db_e)}")
 headers = {
     'User-Agent': 'osrsMarket app',
     'From': 'dlnmtchll@gmail.com' 
@@ -412,12 +543,20 @@ def get_good_trades():
 @login_required
 def alerts():
     """Serve the alerts management page"""
+    # Check if user is premium
+    if not current_user.is_premium:
+        flash('Price alerts are only available for premium users.')
+        return redirect(url_for('account'))
     return render_template('alerts.html')
 
 @app.route('/api/alerts', methods=['GET'])
 @login_required
 def get_alerts():
     """Get all alerts for the current user"""
+    # Check if user is premium
+    if not current_user.is_premium:
+        return jsonify({'error': 'Price alerts are only available for premium users'}), 403
+    
     try:
         user_alerts = Alert.query.filter_by(user_id=current_user.id).order_by(Alert.created_at.desc()).all()
         return jsonify([alert.to_dict() for alert in user_alerts])
@@ -429,6 +568,10 @@ def get_alerts():
 @login_required
 def create_alert():
     """Create a new alert"""
+    # Check if user is premium
+    if not current_user.is_premium:
+        return jsonify({'error': 'Price alerts are only available for premium users'}), 403
+    
     try:
         data = request.get_json()
         
@@ -506,6 +649,10 @@ def create_alert():
 @login_required
 def delete_alert(alert_id):
     """Delete an alert"""
+    # Check if user is premium
+    if not current_user.is_premium:
+        return jsonify({'error': 'Price alerts are only available for premium users'}), 403
+    
     try:
         alert = Alert.query.filter_by(id=alert_id, user_id=current_user.id).first()
         
@@ -526,6 +673,10 @@ def delete_alert(alert_id):
 @login_required
 def toggle_alert(alert_id):
     """Toggle alert active status"""
+    # Check if user is premium
+    if not current_user.is_premium:
+        return jsonify({'error': 'Price alerts are only available for premium users'}), 403
+    
     try:
         alert = Alert.query.filter_by(id=alert_id, user_id=current_user.id).first()
         
@@ -550,6 +701,10 @@ def toggle_alert(alert_id):
 @login_required
 def get_notifications():
     """Get all notifications for the current user"""
+    # Check if user is premium
+    if not current_user.is_premium:
+        return jsonify({'error': 'Notifications are only available for premium users'}), 403
+    
     try:
         notifications = AlertNotification.query.filter_by(
             user_id=current_user.id
@@ -565,6 +720,10 @@ def get_notifications():
 @login_required
 def mark_notification_read(notification_id):
     """Mark a notification as read"""
+    # Check if user is premium
+    if not current_user.is_premium:
+        return jsonify({'error': 'Notifications are only available for premium users'}), 403
+    
     try:
         notification = AlertNotification.query.filter_by(
             id=notification_id,
@@ -588,6 +747,10 @@ def mark_notification_read(notification_id):
 @login_required
 def get_unread_count():
     """Get count of unread notifications"""
+    # Check if user is premium
+    if not current_user.is_premium:
+        return jsonify({'error': 'Notifications are only available for premium users'}), 403
+    
     try:
         count = AlertNotification.query.filter_by(
             user_id=current_user.id,
@@ -604,6 +767,10 @@ def get_unread_count():
 @login_required
 def check_alerts_manually():
     """Manually trigger alert checking for current user"""
+    # Check if user is premium
+    if not current_user.is_premium:
+        return jsonify({'error': 'Price alerts are only available for premium users'}), 403
+    
     try:
         alerts = Alert.query.filter_by(user_id=current_user.id, is_active=True).all()
         triggered_count = 0
@@ -668,6 +835,10 @@ def check_alerts_manually():
                         is_read=False
                     )
                     db.session.add(notification)
+                    db.session.flush()  # Flush to get notification ID
+                    
+                    # Send email notification
+                    send_alert_email(current_user, notification)
                     
                     # Update alert
                     alert.last_triggered = datetime.utcnow()
