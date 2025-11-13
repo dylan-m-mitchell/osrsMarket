@@ -4,7 +4,7 @@ from flask import Flask, render_template, jsonify, request, redirect, url_for, f
 import os
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from flask_wtf.csrf import CSRFProtect
-from models import db, User
+from models import db, User, Alert, AlertNotification
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
@@ -407,6 +407,292 @@ def get_good_trades():
     except Exception as e:
         app.logger.error(f"Good trades error: {str(e)}")
         return jsonify({'error': 'Unable to fetch good trades data'}), 500
+
+@app.route('/alerts')
+@login_required
+def alerts():
+    """Serve the alerts management page"""
+    return render_template('alerts.html')
+
+@app.route('/api/alerts', methods=['GET'])
+@login_required
+def get_alerts():
+    """Get all alerts for the current user"""
+    try:
+        user_alerts = Alert.query.filter_by(user_id=current_user.id).order_by(Alert.created_at.desc()).all()
+        return jsonify([alert.to_dict() for alert in user_alerts])
+    except Exception as e:
+        app.logger.error(f"Get alerts error: {str(e)}")
+        return jsonify({'error': 'Unable to fetch alerts'}), 500
+
+@app.route('/api/alerts', methods=['POST'])
+@login_required
+def create_alert():
+    """Create a new alert"""
+    try:
+        data = request.get_json()
+        
+        if data is None:
+            return jsonify({'error': 'Invalid request format'}), 400
+        
+        item_id = data.get('item_id', '').strip()
+        item_name = data.get('item_name', '').strip()
+        alert_type = data.get('alert_type', '').strip()
+        threshold = data.get('threshold')
+        
+        # Validate input
+        if not item_id or not item_name or not alert_type:
+            return jsonify({'error': 'Item ID, name, and alert type are required'}), 400
+        
+        if alert_type not in ['spike', 'dip', 'fluctuation']:
+            return jsonify({'error': 'Invalid alert type. Must be spike, dip, or fluctuation'}), 400
+        
+        try:
+            threshold = float(threshold)
+            if threshold <= 0 or threshold > 100:
+                return jsonify({'error': 'Threshold must be between 0 and 100'}), 400
+        except (TypeError, ValueError):
+            return jsonify({'error': 'Invalid threshold value'}), 400
+        
+        # Get current price as baseline
+        baseline_price = None
+        try:
+            price_response = requests.get(
+                f"https://prices.runescape.wiki/api/v1/osrs/latest?id={item_id}",
+                headers=headers,
+                timeout=5
+            ).json()
+            
+            if 'data' in price_response and item_id in price_response['data']:
+                item_data = price_response['data'][item_id]
+                # Use average of high and low as baseline
+                high = item_data.get('high')
+                low = item_data.get('low')
+                if high and low:
+                    baseline_price = (high + low) // 2
+                elif high:
+                    baseline_price = high
+                elif low:
+                    baseline_price = low
+        except Exception as e:
+            app.logger.warning(f"Could not fetch baseline price: {str(e)}")
+        
+        # Create alert
+        alert = Alert(
+            user_id=current_user.id,
+            item_id=item_id,
+            item_name=item_name,
+            alert_type=alert_type,
+            threshold=threshold,
+            baseline_price=baseline_price,
+            is_active=True
+        )
+        
+        db.session.add(alert)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Alert created successfully',
+            'alert': alert.to_dict()
+        })
+        
+    except Exception as e:
+        app.logger.error(f"Create alert error: {str(e)}")
+        db.session.rollback()
+        return jsonify({'error': 'An error occurred while creating the alert'}), 500
+
+@app.route('/api/alerts/<int:alert_id>', methods=['DELETE'])
+@login_required
+def delete_alert(alert_id):
+    """Delete an alert"""
+    try:
+        alert = Alert.query.filter_by(id=alert_id, user_id=current_user.id).first()
+        
+        if not alert:
+            return jsonify({'error': 'Alert not found'}), 404
+        
+        db.session.delete(alert)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': 'Alert deleted successfully'})
+        
+    except Exception as e:
+        app.logger.error(f"Delete alert error: {str(e)}")
+        db.session.rollback()
+        return jsonify({'error': 'An error occurred while deleting the alert'}), 500
+
+@app.route('/api/alerts/<int:alert_id>/toggle', methods=['POST'])
+@login_required
+def toggle_alert(alert_id):
+    """Toggle alert active status"""
+    try:
+        alert = Alert.query.filter_by(id=alert_id, user_id=current_user.id).first()
+        
+        if not alert:
+            return jsonify({'error': 'Alert not found'}), 404
+        
+        alert.is_active = not alert.is_active
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Alert {"activated" if alert.is_active else "deactivated"}',
+            'is_active': alert.is_active
+        })
+        
+    except Exception as e:
+        app.logger.error(f"Toggle alert error: {str(e)}")
+        db.session.rollback()
+        return jsonify({'error': 'An error occurred while toggling the alert'}), 500
+
+@app.route('/api/notifications', methods=['GET'])
+@login_required
+def get_notifications():
+    """Get all notifications for the current user"""
+    try:
+        notifications = AlertNotification.query.filter_by(
+            user_id=current_user.id
+        ).order_by(AlertNotification.created_at.desc()).limit(50).all()
+        
+        return jsonify([notif.to_dict() for notif in notifications])
+        
+    except Exception as e:
+        app.logger.error(f"Get notifications error: {str(e)}")
+        return jsonify({'error': 'Unable to fetch notifications'}), 500
+
+@app.route('/api/notifications/<int:notification_id>/read', methods=['POST'])
+@login_required
+def mark_notification_read(notification_id):
+    """Mark a notification as read"""
+    try:
+        notification = AlertNotification.query.filter_by(
+            id=notification_id,
+            user_id=current_user.id
+        ).first()
+        
+        if not notification:
+            return jsonify({'error': 'Notification not found'}), 404
+        
+        notification.is_read = True
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': 'Notification marked as read'})
+        
+    except Exception as e:
+        app.logger.error(f"Mark notification read error: {str(e)}")
+        db.session.rollback()
+        return jsonify({'error': 'An error occurred'}), 500
+
+@app.route('/api/notifications/unread-count', methods=['GET'])
+@login_required
+def get_unread_count():
+    """Get count of unread notifications"""
+    try:
+        count = AlertNotification.query.filter_by(
+            user_id=current_user.id,
+            is_read=False
+        ).count()
+        
+        return jsonify({'count': count})
+        
+    except Exception as e:
+        app.logger.error(f"Get unread count error: {str(e)}")
+        return jsonify({'error': 'Unable to fetch unread count'}), 500
+
+@app.route('/api/check-alerts', methods=['POST'])
+@login_required
+def check_alerts_manually():
+    """Manually trigger alert checking for current user"""
+    try:
+        alerts = Alert.query.filter_by(user_id=current_user.id, is_active=True).all()
+        triggered_count = 0
+        
+        for alert in alerts:
+            try:
+                # Fetch current price
+                price_response = requests.get(
+                    f"https://prices.runescape.wiki/api/v1/osrs/latest?id={alert.item_id}",
+                    headers=headers,
+                    timeout=5
+                ).json()
+                
+                if 'data' not in price_response or alert.item_id not in price_response['data']:
+                    continue
+                
+                item_data = price_response['data'][alert.item_id]
+                high = item_data.get('high')
+                low = item_data.get('low')
+                
+                if not high and not low:
+                    continue
+                
+                # Calculate current price (average of high and low)
+                current_price = None
+                if high and low:
+                    current_price = (high + low) // 2
+                elif high:
+                    current_price = high
+                elif low:
+                    current_price = low
+                
+                # Update baseline if not set
+                if alert.baseline_price is None:
+                    alert.baseline_price = current_price
+                    alert.last_checked = datetime.utcnow()
+                    continue
+                
+                # Calculate price change percentage
+                price_change = ((current_price - alert.baseline_price) / alert.baseline_price) * 100
+                
+                # Check if alert should trigger
+                should_trigger = False
+                if alert.alert_type == 'spike' and price_change >= alert.threshold:
+                    should_trigger = True
+                elif alert.alert_type == 'dip' and price_change <= -alert.threshold:
+                    should_trigger = True
+                elif alert.alert_type == 'fluctuation' and abs(price_change) >= alert.threshold:
+                    should_trigger = True
+                
+                if should_trigger:
+                    # Create notification
+                    notification = AlertNotification(
+                        alert_id=alert.id,
+                        user_id=current_user.id,
+                        item_id=alert.item_id,
+                        item_name=alert.item_name,
+                        alert_type=alert.alert_type,
+                        old_price=alert.baseline_price,
+                        new_price=current_price,
+                        price_change=price_change,
+                        is_read=False
+                    )
+                    db.session.add(notification)
+                    
+                    # Update alert
+                    alert.last_triggered = datetime.utcnow()
+                    alert.baseline_price = current_price  # Reset baseline
+                    triggered_count += 1
+                
+                alert.last_checked = datetime.utcnow()
+                
+            except Exception as e:
+                app.logger.error(f"Error checking alert {alert.id}: {str(e)}")
+                continue
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Checked {len(alerts)} alerts, {triggered_count} triggered',
+            'checked': len(alerts),
+            'triggered': triggered_count
+        })
+        
+    except Exception as e:
+        app.logger.error(f"Check alerts error: {str(e)}")
+        db.session.rollback()
+        return jsonify({'error': 'An error occurred while checking alerts'}), 500
 
 if __name__ == '__main__':
     import os

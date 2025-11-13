@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>Price Alerts - OSRS Market</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/alerts.css') }}">
+</head>
+<body>
+    <div class="account-menu">
+        {% if current_user.is_authenticated %}
+            <div class="account-icon" id="accountIcon">
+                <span class="user-avatar">{{ current_user.username[0].upper() }}</span>
+                <span class="notification-badge" id="notificationBadge" style="display: none;"></span>
+                <div class="dropdown-menu" id="dropdownMenu">
+                    <div class="dropdown-header">
+                        <strong>{{ current_user.username }}</strong>
+                        <span class="user-email">{{ current_user.email }}</span>
+                    </div>
+                    <hr>
+                    <a href="{{ url_for('account') }}">Account Settings</a>
+                    <a href="{{ url_for('alerts') }}">Price Alerts</a>
+                    <a href="{{ url_for('logout') }}">Sign Out</a>
+                </div>
+            </div>
+        {% else %}
+            <div class="auth-links">
+                <a href="{{ url_for('login') }}" class="auth-link">Sign In</a>
+                <a href="{{ url_for('register') }}" class="auth-link register-btn">Sign Up</a>
+            </div>
+        {% endif %}
+    </div>
+    
+    <div class="container">
+        <h1>Price Alerts</h1>
+        
+        <nav class="nav-links">
+            <a href="/">← Back to Market Search</a>
+            <a href="/trades">View Good Trades</a>
+        </nav>
+        
+        <div class="alerts-section">
+            <div class="section-header">
+                <h2>Create New Alert</h2>
+            </div>
+            
+            <div class="alert-form">
+                <div class="form-group">
+                    <label for="alertItemInput">Item Name:</label>
+                    <input type="text" id="alertItemInput" placeholder="Enter item name...">
+                    <div id="alertAutocomplete" class="autocomplete-items"></div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="alertType">Alert Type:</label>
+                    <select id="alertType">
+                        <option value="spike">Price Spike (increase)</option>
+                        <option value="dip">Price Dip (decrease)</option>
+                        <option value="fluctuation">Any Fluctuation</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="alertThreshold">Threshold (%):</label>
+                    <input type="number" id="alertThreshold" min="0.1" max="100" step="0.1" value="5" placeholder="5.0">
+                    <small>Alert when price changes by this percentage</small>
+                </div>
+                
+                <button id="createAlertBtn" class="btn-primary">Create Alert</button>
+            </div>
+        </div>
+        
+        <div id="errorMessage" class="error-message"></div>
+        <div id="successMessage" class="success-message"></div>
+        
+        <div class="alerts-section">
+            <div class="section-header">
+                <h2>My Alerts</h2>
+                <button id="checkAlertsBtn" class="btn-secondary">Check Now</button>
+            </div>
+            
+            <div id="alertsList" class="alerts-list">
+                <p class="loading">Loading alerts...</p>
+            </div>
+        </div>
+        
+        <div class="alerts-section">
+            <div class="section-header">
+                <h2>Recent Notifications</h2>
+            </div>
+            
+            <div id="notificationsList" class="notifications-list">
+                <p class="loading">Loading notifications...</p>
+            </div>
+        </div>
+    </div>
+    
+    <script src="{{ url_for('static', filename='js/alerts.js') }}"></script>
+    <script>
+        // Account menu dropdown toggle
+        const accountIcon = document.getElementById('accountIcon');
+        const dropdownMenu = document.getElementById('dropdownMenu');
+        
+        if (accountIcon && dropdownMenu) {
+            accountIcon.addEventListener('click', (e) => {
+                e.stopPropagation();
+                dropdownMenu.classList.toggle('show');
+            });
+            
+            // Close dropdown when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!accountIcon.contains(e.target)) {
+                    dropdownMenu.classList.remove('show');
+                }
+            });
+        }
+    </script>
+</body>
+</html>

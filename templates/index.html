@@ -22,6 +22,7 @@
                     </div>
                     <hr>
                     <a href="{{ url_for('account') }}">Account Settings</a>
+                    <a href="{{ url_for('alerts') }}">Price Alerts</a>
                     <a href="{{ url_for('logout') }}">Sign Out</a>
                 </div>
             </div>
@@ -47,6 +48,12 @@
         </div>
         
         <div id="currentItem" class="current-item"></div>
+        
+        {% if current_user.is_authenticated %}
+        <div id="quickAlertSection" class="quick-alert-section" style="display: none;">
+            <button id="quickAlertBtn" class="btn-quick-alert">⚡ Create Price Alert for This Item</button>
+        </div>
+        {% endif %}
         
         <div id="errorMessage" class="error-message"></div>
         
