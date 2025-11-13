@@ -205,8 +205,13 @@ This is an automated message from OSRS Market. To disable email notifications, v
         app.logger.info(f"Sent email notification to {user.email} for alert {notification.id}")
     except Exception as e:
         app.logger.error(f"Failed to send email notification: {str(e)}")
-
-
+        # Record the failure in the database for monitoring/retry
+        try:
+            notification.email_status = 'failed'
+            notification.email_error = str(e)
+            db.session.commit()
+        except Exception as db_e:
+            app.logger.error(f"Failed to record email failure in DB: {str(db_e)}")
 headers = {
     'User-Agent': 'osrsMarket app',
     'From': 'dlnmtchll@gmail.com' 
